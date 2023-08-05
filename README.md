@@ -1,6 +1,6 @@
 # Open Media Vault 2 MQTT
 
-Create a wrapper to send data of Open Media Vault to MQTT broker.
+Wrapper for send data of Open Media Vault to MQTT broker.
 
 ## Usage
 
