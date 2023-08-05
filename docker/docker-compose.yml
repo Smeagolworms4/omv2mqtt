@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+    omv2mqtt:
+        image: node:lts-alpine
+        tty: true
+        volumes:
+            - ../:/app
+            - .history_omv2mqtt:/home/node/.ash_history
+            - ./config/dev/profile:/etc/profile.d/user.sh
+        working_dir:
+            /app
+        env_file:
+            - ../.env
+            - ../.env.local
+        network_mode: host
+            
+    mosquitto:
+        image: eclipse-mosquitto:latest
+        network_mode: host
+    
+    mqqt_explorer:
+        image: smeagolworms4/mqtt-explorer
+        network_mode: host
+        volumes:
+            - ./config/mqqt_explorer:/mqtt-explorer/config
+        

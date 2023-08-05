@@ -1,0 +1,5 @@
+/dist
+/node_modules
+.env.local
+/docker/.history*
+/docker/.makefiles

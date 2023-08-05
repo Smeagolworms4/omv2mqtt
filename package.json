@@ -1,0 +1,25 @@
+{
+  "name": "omv2mqtt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js -m $MQTT_URI -o $OMV_URL -u $OMV_LOGIN -p $OMV_PASSWORD -l DEBUG --scan-interval 10 --login-interval 30",
+    "start:dev": "node --inspect=0.0.0.0:9229 dist/index.js -m $MQTT_URI -o $OMV_URL -u $OMV_LOGIN -p $OMV_PASSWORD -l DEBUG --scan-interval 10 --login-interval 30",
+    "watch": "tsc-watch --onSuccess \"npm run start:dev\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "minimist": "^1.2.8",
+    "mqtt": "^5.0.2",
+    "node-fetch": "^2.6.12"
+  },
+  "devDependencies": {
+    "@types/mqtt": "^2.5.0",
+    "@types/node": "^20.4.7",
+    "tsc-watch": "^6.0.4",
+    "typescript": "^5.1.6"
+  }
+}
