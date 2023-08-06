@@ -123,6 +123,17 @@ console.log('Config:', `
     log:             ${args.l.toUpperCase()}
 `);
 
+const deviceService = {
+	"identifiers": [mqttPrefix + '.services'],
+	"name": `${mqttPrefix.toUpperCase()} - Services`,
+	"model": "Open Media Vault"
+};
+const deviceSystem = {
+	"identifiers": [mqttPrefix + '.system'],
+	"name": `${mqttPrefix.toUpperCase()} - System`,
+	"model": "Open Media Vault"
+};
+
 const client = mqtt.connect(mqttUri);
 
 client.on('connect', () => {
@@ -233,16 +244,10 @@ const updateServices = async () => {
 		const json = await requestOMV({ "service": "Services", "method": "getStatus", "params": { "limit": -1, "start": 0 }, "options": null });
 		
 		
-		const device = {
-			"identifiers": [mqttPrefix + '.services'],
-			"name": `${mqttPrefix.toUpperCase()} - Services`,
-			"model": "Open Media Vault"
-		};
-		
 		for (const service of json.response.data) {
 			publish('services', {
 				[service.name]: {
-					state: service.running ? 'on' : 'off',
+					state: service.running ? 'ON' : 'OFF',
 					attributes: JSON.stringify({
 						name: service.name,
 						enabled: service.enabled,
@@ -252,12 +257,12 @@ const updateServices = async () => {
 				}
 			});
 			configHA(
-				'sensor',
+				'binary_sensor',
 				`services.${service.name}`,
 				service.title,
 				`services/${service.name}`,
 				{
-					device,
+					device: deviceService,
 					icon: 'mdi:cog',
 				}
 			);
@@ -268,6 +273,215 @@ const updateServices = async () => {
 	} 
 };
 
+
+const updateSystem = async () => {
+	try {	
+		console.debug('Update System');
+		
+		const [
+			infos,
+			cpuTemp,
+		] = await Promise.all([
+			requestOMV({ "service": "System", "method": "getInformation", "params": null, "options": null }),
+			requestOMV({ "service": "CpuTemp", "method": "get", "params": null,"options": null }),
+		]);
+		
+		const upTime =  new Date();
+		upTime.setTime(upTime.getTime() - infos.response.uptime * 1000);
+		
+		publish('system', {
+			hostname: {
+				state: infos.response.hostname,
+				attributes: JSON.stringify({})
+			},
+			version: {
+				state: infos.response.version,
+				attributes: JSON.stringify({})
+			},
+			cpu_model_name: {
+				state: infos.response.cpuModelName,
+				attributes: JSON.stringify({})
+			},
+			kernel: {
+				state: infos.response.kernel,
+				attributes: JSON.stringify({})
+			},
+			cpu_usage: {
+				state: infos.response.loadAverage['1min'].toString(),
+				attributes: JSON.stringify({
+					loadaverage_1: infos.response.loadAverage['1min'],
+					loadaverage_5: infos.response.loadAverage['5min'],
+					loadaverage_15: infos.response.loadAverage['15min'],
+				})
+			},
+			memory: {
+				state: (Math.round(infos.response.memUsed / infos.response.memTotal * 10000) / 100).toString(),
+				attributes: JSON.stringify({
+					total: infos.response.memTotal,
+					used: infos.response.memUsed,
+					free: infos.response.memFree,
+				})
+			},
+			uptime: {
+				state: upTime.toISOString().split('.')[0] + '+00:00',
+				attributes: JSON.stringify({})
+			},
+			update_available: {
+				state: infos.response.availablePkgUpdates ? 'ON' : 'OFF',
+				attributes: JSON.stringify({})
+			},
+			config_dirty: {
+				state: infos.response.configDirty ? 'ON' : 'OFF',
+				attributes: JSON.stringify({})
+			},
+			reboot_required: {
+				state: infos.response.rebootRequired ? 'ON' : 'OFF',
+				attributes: JSON.stringify({})
+			},
+			cpu_temperature: {
+				state: cpuTemp.response.cputemp.toString(),
+				attributes: JSON.stringify({})
+			},
+			last_refresh: {
+				state: (new Date()).toISOString().split('.')[0] + '+00:00',
+				attributes: JSON.stringify({})
+			},
+		});
+		
+		configHA(
+			'sensor',
+			`system.hostname`,
+			'Hostname',
+			`system/hostname`,
+			{
+				device: deviceSystem,
+				icon: 'mdi:web',
+			}
+		);
+		configHA(
+			'sensor',
+			`system.kernel`,
+			'Kernel:',
+			`system/kernel`,
+			{
+				device: deviceSystem,
+			}
+		);
+		configHA(
+			'sensor',
+			`system.version`,
+			'Version',
+			`system/version`,
+			{
+				device: deviceSystem,
+			}
+		);
+		configHA(
+			'sensor',
+			`system.cpu_model_name`,
+			'CPU Model name',
+			`system/cpu_model_name`,
+			{
+				device: deviceSystem,
+			}
+		);
+		configHA(
+			'sensor',
+			`system.cpu_usage`,
+			'CPU Usage',
+			`system/cpu_usage`,
+			{
+				device: deviceSystem,
+				unit_of_measurement: '%',
+				icon: 'mdi:speedometer',
+				state_class: 'measurement'
+			}
+		);
+		configHA(
+			'sensor',
+			`system.memory`,
+			'Memory',
+			`system/memory`,
+			{
+				device: deviceSystem,
+				unit_of_measurement: '%',
+				icon: 'mdi:memory',
+				state_class: 'measurement'
+			}
+		);
+		configHA(
+			'sensor',
+			`system.uptime`,
+			'Uptime',
+			`system/uptime`,
+			{
+				device: deviceSystem,
+				icon: 'mdi:clock-outline',
+				device_class: 'timestamp',
+			}
+		);
+		configHA(
+			'binary_sensor',
+			`system.update_available`,
+			'Update available',
+			`system/update_available`,
+			{
+				device: deviceSystem,
+				icon: 'mdi:package',
+				device_class: 'update'
+			}
+		);
+		configHA(
+			'binary_sensor',
+			`system.config_dirty`,
+			'Config dirty',
+			`system/config_dirty`,
+			{
+				device: deviceSystem,
+				icon: 'mdi:liquid-spot',
+			}
+		);
+		
+		configHA(
+			'binary_sensor',
+			`system.reboot_required`,
+			'Reboot required',
+			`system/reboot_required`,
+			{
+				device: deviceSystem,
+				icon: 'mdi:restart-alert',
+			}
+		);
+		configHA(
+			'sensor',
+			`system.cpu_temperature`,
+			'CPU Temperature',
+			`system/cpu_temperature`,
+			{
+				device: deviceSystem,
+				icon: 'hass:thermometer',
+				unit_of_measurement: '°C',
+				state_class: 'measurement'
+			}
+		);
+		configHA(
+			'sensor',
+			`system.last_refresh`,
+			'Last refresh',
+			`system/last_refresh`,
+			{
+				device: deviceSystem,
+				icon: 'mdi:clock-outline',
+				device_class: 'timestamp',
+			}
+		);
+		
+	} catch(e) {
+		console.error('ERROR:', e)
+	} 
+};
+
+
 let tick = 0;
 const mainLoop = async () => {
 	
@@ -277,18 +491,12 @@ const mainLoop = async () => {
 		await login();
 		
 		const [
-			infos,
-			cpuTemp,
 			networks,
 		] = await Promise.all([
-			await requestOMV({ "service": "System", "method": "getInformation", "params": null, "options": null }),
-			await requestOMV({ "service": "CpuTemp", "method": "get", "params": null,"options": null }),
 			await requestOMV({ "service": "Network", "method": "enumerateDevicesList", "params": { "limit": -1, "start": 0 }, "options": null }),
 		]);
 		
 		console.debug('All infos:', {
-			infos,
-			cpuTemp,
 			networks
 		});
 		
@@ -296,6 +504,7 @@ const mainLoop = async () => {
 		
 		await Promise.all([
 			updateServices(),
+			updateSystem(),
 		]);
 		
 	} catch(e) {
