@@ -191,6 +191,12 @@ const main = async () => {
 			return requestOMV({ "service": "System", "method": "getInformation", "params": null, "options": null });
 		};
 		
+		const subscribed: any = {};
+		const subscribe = (topic: string, callback: Function) => {
+			client.subscribe(topic, error => { if (error) console.error(error) });
+			subscribed[topic] = callback;
+		};
+		
 		let jsonSystem = await callSystem();
 		
 		const deviceService = {
@@ -217,11 +223,44 @@ const main = async () => {
 
 		client.on('connect', () => {
 			console.log('Connected to MQTT: ', mqttUri);
+			subscribe(`${mqttPrefix}/system/reboot`, reboot);
+			subscribe(`${mqttPrefix}/system/shutdown`, shutdown);
 		});
 
 		client.on('error', function (error) {
 			console.error('Error to MQTT:', error);
 		});
+		
+		
+		client.on('message', (topic: string, value: Buffer) => {
+			const cb = subscribed[topic];
+			if (cb) {
+				cb(value.toString());
+			}
+		});
+		
+		const reboot = async (value: string) => {
+			try {
+				console.log('MESSAGE: On reboot:', value);
+				if (value === 'PRESS') {
+					await requestOMV({ "service": "System", "method": "reboot", "params": { "delay": 0 }, "options": null });
+					publish('system/reboot', 'OK');
+				}
+			} catch(e) {
+				console.error(publish('system/reboot', 'FAILED'));
+			}
+		};
+		const shutdown = async (value: string) => {
+			try {
+				console.log('MESSAGE: On shutdown:', value);
+				if (value === 'PRESS') {
+					await requestOMV({ "service": "System", "method": "shutdown", "params": { "delay": 0 }, "options": null });
+					publish('system/shutdown', 'OK');
+				}
+			} catch(e) {
+				console.error(publish('system/shutdown', 'FAILED'));
+			}
+		};
 
 		const publish = (path: string, data: any, sub: boolean = false) => {
 			if (!sub) {
@@ -261,8 +300,26 @@ const main = async () => {
 				}), true);
 			}
 		};
-
-
+		
+		
+		const buttonHA = (
+			type: string, 
+			id: string,
+			name: string,
+			path: string,
+			extraConf: any = {}
+		) => {
+			if (haDiscovery) {
+				publish(`${haPrefix}/${type}/${mqttPrefix}/${id.replace(/\W/gi, '_')}/config`, JSON.stringify({
+					uniq_id: mqttPrefix + '.' + id,
+					object_id: mqttPrefix + '.' + id,
+					name: name,
+					command_topic: `${mqttPrefix}/${path}`,
+					...extraConf
+				}), true);
+			}
+		};
+		
 		const updateServices = async () => {
 			try {	
 				console.debug('Update Service');
@@ -492,6 +549,7 @@ const main = async () => {
 						state_class: 'measurement'
 					}
 				);
+				
 				configHA(
 					'sensor',
 					`system.last_refresh`,
@@ -503,6 +561,32 @@ const main = async () => {
 						device_class: 'timestamp',
 					},
 					false
+				);
+				
+				buttonHA(
+					'button',
+					`system.reboot`,
+					'Reboot',
+					`system/reboot`,
+					{
+						device: deviceSystem,
+						icon: 'mdi:restart',
+						payload_available: 'OK',
+						payload_not_available: 'FAILED',
+					}
+				);
+				
+				buttonHA(
+					'button',
+					`system.shutdown`,
+					'Shutdown',
+					`system/shutdown`,
+					{
+						device: deviceSystem,
+						icon: 'mdi:power',
+						payload_available: 'OK',
+						payload_not_available: 'FAILED',
+					}
 				);
 				
 			} catch(e) {
@@ -706,7 +790,6 @@ const main = async () => {
 				dateLogin = null;
 			}
 		};
-		
 		
 		const updateDisks = async () => {
 			
