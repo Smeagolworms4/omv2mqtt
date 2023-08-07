@@ -256,7 +256,7 @@ const main = async () => {
 					name: name,
 					stat_t: `${mqttPrefix}/${path}/state`,
 					json_attr_t: `${mqttPrefix}/${path}/attributes`,
-					...(expireAfter ? { expire_after: (scanIterval * 2).toString() } : {}),
+					...(expireAfter ? { expire_after: (scanIterval * 5).toString() } : {}),
 					...extraConf
 				}), true);
 			}
@@ -285,7 +285,7 @@ const main = async () => {
 						`services/${service.name.toLowerCase()}`,
 						{
 							device: deviceService,
-							icon: 'mdi:cog',
+							icon: 'mdi:cog'
 						}
 					);
 				}
@@ -568,8 +568,8 @@ const main = async () => {
 						const rxDelta = Math.max(0, rxCur - rxPrev) * 8;
 						const txDelta = Math.max(0, txCur - txPrev) * 8;
 						
-						const rx = (rxDelta / (now.getTime() - prevRTX.getTime())) / 1000 * 1024;
-						const tx = (txDelta / (now.getTime() - prevRTX.getTime())) / 1000 * 1024;
+						const rx = (rxDelta / (now.getTime() - prevRTX.getTime())) / 1000;
+						const tx = (txDelta / (now.getTime() - prevRTX.getTime())) / 1000;
 						
 						prevValues[network.devicename] = {
 							rx: rxCur,
@@ -649,7 +649,7 @@ const main = async () => {
 							`networks/${network.devicename}/connection`,
 							{
 								device,
-								icon: 'mdi:lan-connect',
+								icon: 'mdi:lan-connect'
 							}
 						);
 						
@@ -663,7 +663,9 @@ const main = async () => {
 								icon: 'mdi:download-network-outline',
 								device_class: 'data_rate',
 								state_class: 'measurement',
-								unit_of_measurement: 'kB/s',
+								unit_of_measurement: 'B/s',
+								suggested_display_precision: 2,
+								suggested_unit_of_measurement: 'kB/s',
 							}
 						);
 						configHA(
@@ -676,7 +678,9 @@ const main = async () => {
 								icon: 'mdi:upload-network-outline',
 								device_class: 'data_rate',
 								state_class: 'measurement',
-								unit_of_measurement: 'kB/s',
+								unit_of_measurement: 'B/s',
+								suggested_display_precision: 2,
+								suggested_unit_of_measurement: 'kB/s',
 							}
 						);
 						
@@ -806,6 +810,159 @@ const main = async () => {
 			}
 		};
 		
+		const updateFS = async () => {
+			
+			try {
+				
+				console.debug('Update Files systems');
+				
+				const json = await requestOMV({ "service": "FileSystemMgmt", "method": "enumerateFilesystems", "params": { "limit": -1, "start": 0 }, "options": null });
+				
+				
+				for (const fs of json.response) {
+					
+					
+					const name = fs.devicename;
+					const label = fs.label || fs.devicename;
+					
+					const device = {
+						"identifiers": [mqttPrefix + '.filesystem.' + name],
+						"name": `${mqttPrefix.toUpperCase()} - File System - ${label}`,
+						"model": "Open Media Vault",
+						'configuration_url': omvUrl,
+						get sw_version() {
+							return jsonSystem?.response?.version || null;
+						},
+					};
+					
+					const attributes = {
+						devicename: name,
+						devicefile: fs.devicefile || 'unknown',
+						devicefiles: JSON.stringify(fs.devicefiles || []),
+						predictabledevicefile: fs.predictabledevicefile || 'unknown',
+						canonicaldevicefile: fs.predictabledevicefile.canonicaldevicefile || 'unknown',
+						parentdevicefile: fs.parentdevicefile || 'unknown',
+						devlinks: JSON.stringify(fs.devlinks || []),
+						uuid: fs.uuid || 'unknown',
+						label,
+						type: fs.type,
+						blocks: fs.blocks,
+						description: fs.description || '',
+						comment: fs.comment || '',
+						quota: !fs.propquota,
+						resize: !fs.propresize,
+						fstab: !fs.propfstab,
+						compress: !fs.propcompress,
+						auto_defrag: !fs.propautodefrag,
+						readonly: !fs.propreadonly,
+						has_multiple_devices: !fs.hasmultipledevices,
+					};
+					
+					publish(`filesystem/${name}`, {
+						mounted: {
+							state: fs.mounted ? 'ON' : 'OFF',
+							attributes: JSON.stringify(attributes)
+						},
+						occupation: {
+							state: (fs.percentage || 0).toString(),
+							attributes: JSON.stringify(attributes)
+						},
+						size: {
+							state: (fs.size || 0).toString(),
+							attributes: JSON.stringify(attributes)
+						},
+						free: {
+							state: (fs.available || 0).toString(),
+							attributes: JSON.stringify(attributes)
+						},
+						used: {
+							state: Math.max(0, ((fs.size || 0) - (fs.available || 0))).toString(),
+							attributes: JSON.stringify(attributes)
+						},
+					});
+					
+					
+					configHA(
+						'binary_sensor',
+						`filesystem.${name}.mounted`,
+						'Mounted',
+						`filesystem/${name}/mounted`,
+						{
+							device,
+							icon: 'mdi:harddisk',
+							device_class: 'plug'
+						}
+					);
+					
+					configHA(
+						'sensor',
+						`filesystem.${name}.occupation`,
+						'Occupation',
+						`filesystem/${name}/occupation`,
+						{
+							device,
+							icon: 'mdi:harddisk',
+							unit_of_measurement: '%',
+						}
+					);
+					
+					configHA(
+						'sensor',
+						`filesystem.${name}.size`,
+						'Size',
+						`filesystem/${name}/size`,
+						{
+							device,
+							icon: 'mdi:harddisk',
+							device_class: 'data_size',
+							state_class: 'measurement',
+							unit_of_measurement: 'B',
+							suggested_display_precision: 2,
+							suggested_unit_of_measurement: 'GB',
+						}
+					);
+					
+					configHA(
+						'sensor',
+						`filesystem.${name}.used`,
+						'Used',
+						`filesystem/${name}/used`,
+						{
+							device,
+							icon: 'mdi:harddisk',
+							device_class: 'data_size',
+							state_class: 'measurement',
+							unit_of_measurement: 'B',
+							suggested_display_precision: 2,
+							suggested_unit_of_measurement: 'GB',
+						}
+					);
+					
+					configHA(
+						'sensor',
+						`filesystem.${name}.free`,
+						'Free',
+						`filesystem/${name}/free`,
+						{
+							device,
+							icon: 'mdi:harddisk',
+							device_class: 'data_size',
+							state_class: 'measurement',
+							unit_of_measurement: 'B',
+							suggested_display_precision: 2,
+							suggested_unit_of_measurement: 'GB',
+						}
+					);
+					
+				}
+				
+			} catch(e) {
+				console.error(e);
+				dateLogin = null;
+			}
+				
+		};
+		
 		let tick = 0;
 		const mainLoop = async () => {
 			
@@ -822,6 +979,7 @@ const main = async () => {
 					updateSystem(),
 					updateNetworks(),
 					updateDisks(),
+					updateFS(),
 				]);
 				
 			} catch(e) {
