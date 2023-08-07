@@ -271,7 +271,7 @@ const main = async () => {
 				
 				for (const service of json.response.data) {
 					publish('services', {
-						[service.name]: {
+						[service.name.toLowerCase()]: {
 							state: service.running ? 'ON' : 'OFF',
 							attributes: JSON.stringify({
 								enabled: service.enabled,
@@ -280,9 +280,9 @@ const main = async () => {
 					});
 					configHA(
 						'binary_sensor',
-						`services.${service.name}`,
+						`services.${service.name.toLowerCase()}`,
 						service.title,
-						`services/${service.name}`,
+						`services/${service.name.toLowerCase()}`,
 						{
 							device: deviceService,
 							icon: 'mdi:cog',
