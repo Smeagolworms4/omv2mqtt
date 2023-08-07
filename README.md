@@ -1,6 +1,6 @@
 # Open Media Vault 2 MQTT
 
-Wrapper for send data of Open Media Vault to MQTT broker.
+OMV2MQTT is a wrapper for send data of Open Media Vault to MQTT broker.
 
 ## Usage
 
