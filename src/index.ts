@@ -182,25 +182,41 @@ const main = async () => {
 				}, false)
 				
 				dateLogin = new Date();
-				console.log('OMV login success:', result);	
+				console.log('OMV login success');	
+				console.debug('Login result:', result);	
 			} catch(e) {
 				console.error('ERROR LOGIN:', e);
 				throw new Error('ERROR Login failed');
 			}
 		};
-
-		await login();
+		
 		const callSystem = async() => {
 			return requestOMV({ "service": "System", "method": "getInformation", "params": null, "options": null });
 		};
-		
 		const subscribed: any = {};
+		let jsonSystem:any = null;
+		
+		const initialize = async () => {
+			try {
+				await login();
+				jsonSystem = await callSystem();
+				console.log('Initialize success');
+			} catch(e) {
+				console.error('ERROR INITIALIZE:', e);
+				console.log('Wait 5 seconds and retry initialize');
+				await new Promise(r => setTimeout(r, 5000));
+				initialize();
+			}
+		};
+		
+		await initialize();
+
+		
 		const subscribe = (topic: string, callback: Function) => {
 			client.subscribe(topic, error => { if (error) console.error(error) });
 			subscribed[topic] = callback;
 		};
 		
-		let jsonSystem = await callSystem();
 		
 		const deviceService = {
 			"identifiers": [mqttPrefix + '.services'],
