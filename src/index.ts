@@ -107,23 +107,26 @@ switch (mqttQos) {
 const omvUrl = args.o;
 const omvLogin = args.u;
 const omvPassword = args.p;
-const omvExposedNetworks = args['omv-exposed-networks'] || 'eth0,wlan0';
+const omvExposedNetworks = (args['omv-exposed-networks'] || 'eth0,wlan0').split(/,/g);
 let scanIterval = parseInt(args['scan-interval'], 10); isNaN(scanIterval) || scanIterval < 1 ? 30 : scanIterval;
 let loginIterval = parseInt(args['login-interval'], 10); isNaN(loginIterval) || loginIterval < 1 ? 300 : loginIterval;
 const haDiscovery = args['ha-discovery'] === '1';
 const haPrefix = (args['ha-prefix'] || 'homeassistant').split(/,/g);
 
 console.log('Config:', `
-    mqtt-uri:        ${mqttUri}
-    mqtt-prefix:     ${mqttPrefix}
-    mqtt-retain:     ${mqttRetain}
-    mqtt-qos:        ${mqttQos}
-    omv-url:         ${omvUrl}
-    omv-login:       ${omvLogin}
-    omv-password:    ${omvPassword.replace(/./g, '*')}
-    scan-interval:   ${scanIterval}
-    login-interval:  ${loginIterval}
-    log:             ${args.l.toUpperCase()}
+    mqtt-uri:             ${mqttUri}
+    mqtt-prefix:          ${mqttPrefix}
+    mqtt-retain:          ${mqttRetain ? 'enabled' : 'disabled'}
+    mqtt-qos:             ${mqttQos}
+    omv-url:              ${omvUrl}
+    omv-login:            ${omvLogin}
+    omv-password:         ${omvPassword.replace(/./g, '*')}
+    omv-exposed-networks: ${omvExposedNetworks.join(', ')}
+    scan-interval:        ${scanIterval}
+    login-interval:       ${loginIterval}
+    ha-discovery:         ${haDiscovery ? 'enabled' : 'disabled'}
+    ha-prefix:            ${haPrefix}
+    log:                  ${args.l.toUpperCase()}
 `);
 
 
