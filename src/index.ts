@@ -97,7 +97,7 @@ switch(args.l.toLowerCase()) {
 
 const mqttUri = args.m;
 const mqttPrefix = args['mqtt-prefix'];
-const mqttRetain = args['mqtt-retain'] === '1';
+const mqttRetain = args['mqtt-retain'] === '1' || args['mqtt-retain']?.toLowerCase() === 'true';
 let mqttQos = parseInt(args['mqtt-qos'], 10);
 switch (mqttQos) {
 	case 1: break;
@@ -110,8 +110,8 @@ const omvPassword = args.p;
 const omvExposedNetworks = (args['omv-exposed-networks'] || 'eth0,wlan0').split(/,/g);
 let scanIterval = parseInt(args['scan-interval'], 10); isNaN(scanIterval) || scanIterval < 1 ? 30 : scanIterval;
 let loginIterval = parseInt(args['login-interval'], 10); isNaN(loginIterval) || loginIterval < 1 ? 300 : loginIterval;
-const haDiscovery = args['ha-discovery'] === '1';
-const haPrefix = (args['ha-prefix'] || 'homeassistant').split(/,/g);
+const haDiscovery = args['ha-discovery'] === '1' || args['ha-discovery']?.toLowerCase() === 'true';
+const haPrefix = (args['ha-prefix'] || 'homeassistant');
 
 console.log('Config:', `
     mqtt-uri:             ${mqttUri}
