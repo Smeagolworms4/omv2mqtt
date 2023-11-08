@@ -1,6 +1,7 @@
 import minimist from 'minimist';
 import * as mqtt from 'mqtt';
 import fetch from 'node-fetch';
+import * as https from 'https';
 
 
 console.log('');
@@ -20,6 +21,7 @@ const args = minimist(rawArgv, {
 		'omv-url',
 		'omv-login',
 		'omv-password',
+		'omv-disable-check-https',
 		'omv-exposed-networks',
 		'scan-interval',
 		'ha-discovery',
@@ -46,7 +48,8 @@ const args = minimist(rawArgv, {
 		'ha-prefix': 'homeassistant',
 		'scan-interval': '30',
 		'login-interval': '300',
-		'omv-exposed-networks': 'eth0,wlan0'
+		'omv-exposed-networks': 'eth0,wlan0',
+		'omv-disable-check-https' : '0'
 	}
 });
 
@@ -70,20 +73,21 @@ Run command:
    
 Parameters:
     
-    mqtt-uri, m           Set MQTT URI for connection (example: mqtt://login:password@127.0.0.1:1883 or mqtt://127.0.0.1:1883)
-    mqtt-prefix           Set prefix for mqtt(default: omv)
-    mqtt-retain           Set retain value for MQTT, values must be 0 or 1 (default: 1),
-    mqtt-qos              Set QOS value for MQTT, values must be 0, 1 or 2 (default: 0),
-    omv-url, o            Set Base URL for Open Media Vault (example: http://192.168.1.1)
-    omv-login, o          Set login for Open Media Vault
-    omv-password, o       Set password for Open Media Vault
-    omv-exposed-networks  Exposed networks interface seprate by comma (default: eth0, wlan0)
-    scan-interval         Set scan refresh interval in second (default: 30) 
-    login-interval        Set login refresh interval in second (default: 300)
-    ha-discovery          Enable Home Assistant discovery, values must be 0 or 1 (default: 1),
-    ha-prefix             Home Assistant discovery prefix (default: homeassistant),
-    log, l                Log level (ERROR, MESSAGE, DEBUG) (default MESSAGE)
-    help, h               Display help
+    mqtt-uri, m              Set MQTT URI for connection (example: mqtt://login:password@127.0.0.1:1883 or mqtt://127.0.0.1:1883)
+    mqtt-prefix              Set prefix for mqtt(default: omv)
+    mqtt-retain              Set retain value for MQTT, values must be 0 or 1 (default: 1),
+    mqtt-qos                 Set QOS value for MQTT, values must be 0, 1 or 2 (default: 0),
+    omv-url, o               Set Base URL for Open Media Vault (example: http://192.168.1.1)
+    omv-login, o             Set login for Open Media Vault
+    omv-password, o          Set password for Open Media Vault
+    omv-exposed-networks     Exposed networks interface seprate by comma (default: eth0, wlan0)
+    omv-disable-check-https  Disable check HTTPS
+    scan-interval            Set scan refresh interval in second (default: 30) 
+    login-interval           Set login refresh interval in second (default: 300)
+    ha-discovery             Enable Home Assistant discovery, values must be 0 or 1 (default: 1),
+    ha-prefix                Home Assistant discovery prefix (default: homeassistant),
+    log, l                   Log level (ERROR, MESSAGE, DEBUG) (default MESSAGE)
+    help, h                  Display help
     
     `);
 	process.exit(0);
@@ -108,6 +112,7 @@ const omvUrl = args.o;
 const omvLogin = args.u;
 const omvPassword = args.p;
 const omvExposedNetworks = (args['omv-exposed-networks'] || 'eth0,wlan0').split(/,/g);
+let omvDisableCheckHttps = parseInt(args['omv-disable-check-https'], 10); isNaN(omvExposedNetworks) ? 0 : !!omvExposedNetworks;
 let scanIterval = parseInt(args['scan-interval'], 10); isNaN(scanIterval) || scanIterval < 1 ? 30 : scanIterval;
 let loginIterval = parseInt(args['login-interval'], 10); isNaN(loginIterval) || loginIterval < 1 ? 300 : loginIterval;
 const haDiscovery = args['ha-discovery'] === '1' || args['ha-discovery']?.toLowerCase() === 'true';
@@ -129,6 +134,9 @@ console.log('Config:', `
     log:                  ${args.l.toUpperCase()}
 `);
 
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false, // Attention: cela désactive la vérification SSL
+});
 
 let upTime = new Date();
 let dateLogin = null;
@@ -145,6 +153,7 @@ const main = async () => {
 				headers: connected ? {
 					'Cookie': cookies
 				} : {}
+				...(omvDisableCheckHttps ? { agent: httpsAgent } : {})
 			};
 			
 			console.debug(`Call POST ${url}`, options);

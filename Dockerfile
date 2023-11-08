@@ -21,6 +21,7 @@ ENV OMV_URL=
 ENV OMV_LOGIN=
 ENV OMV_PASSWORD=
 ENV OMV_EXPOSED_NETWORKS=eth0,wlan0
+ENV OMV_DISABLE_CHECK_HTTPS=0
 ENV SCAN_INTERVAL=30
 ENV LOGIN_INTERVAL=300
 ENV DEBUG=MESSAGE
@@ -43,4 +44,5 @@ CMD node dist/index.js \
 	--mqtt-qos $MQTT_QOS \
 	--ha-discovery $HA_DISCOVERY \
 	--ha-prefix $HA_PREFIX \
-	--omv-exposed-networks $OMV_EXPOSED_NETWORKS
+	--omv-exposed-networks $OMV_EXPOSED_NETWORKS \
+	--omv-disable-check-https $OMV_DISABLE_CHECK_HTTPS

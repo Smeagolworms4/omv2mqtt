@@ -28,11 +28,12 @@ docker run -ti \
 ## Environment variables
 
 ```
-ENV MQTT_URI=           #Required
-ENV OMV_URL=            #Required
-ENV OMV_LOGIN=          #Required
-ENV OMV_PASSWORD=       #Required
+ENV MQTT_URI=                       #Required
+ENV OMV_URL=                        #Required
+ENV OMV_LOGIN=                      #Required
+ENV OMV_PASSWORD=                   #Required
 ENV OMV_EXPOSED_NETWORKS=eth0,wlan0
+ENV OMV_DISABLE_CHECK_HTTPS=0
 ENV SCAN_INTERVAL=30
 ENV LOGIN_INTERVAL=300
 ENV DEBUG=MESSAGE
