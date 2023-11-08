@@ -152,7 +152,7 @@ const main = async () => {
 				body: JSON.stringify(body),
 				headers: connected ? {
 					'Cookie': cookies
-				} : {}
+				} : {},
 				...(omvDisableCheckHttps ? { agent: httpsAgent } : {})
 			};
 			
