@@ -4,17 +4,19 @@ FROM node:lts-alpine AS builder
 WORKDIR /app
 
 # Copie des fichiers et dossiers nécessaires
-COPY src /app/src
-COPY tsconfig.json package-lock.json package.json /app/
-RUN npm install && npm run build
+#COPY src /app/src
+#COPY tsconfig.json package-lock.json package.json /app/
+#RUN npm install && npm run build
 
 # Étape de production
 FROM node:lts-alpine AS runner
 
 WORKDIR /app
 
-COPY --from=builder --chown=node:node /app/dist ./dist
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY dist ./dist
+COPY node_modules ./node_modules
+#COPY --from=builder --chown=node:node /app/dist ./dist
+#COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 
 ENV MQTT_URI=
 ENV OMV_URL=
