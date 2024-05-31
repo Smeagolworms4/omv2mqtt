@@ -144,19 +144,20 @@ isNaN(loginIterval) || loginIterval < 1 ? 300 : loginIterval;
 const haDiscovery = args['ha-discovery'] === '1' || args['ha-discovery']?.toLowerCase() === 'true';
 const haPrefix = (args['ha-prefix'] || 'homeassistant');
 console.log('Config:', `
-    mqtt-uri:             ${mqttUri}
-    mqtt-prefix:          ${mqttPrefix}
-    mqtt-retain:          ${mqttRetain ? 'enabled' : 'disabled'}
-    mqtt-qos:             ${mqttQos}
-    omv-url:              ${omvUrl}
-    omv-login:            ${omvLogin}
-    omv-password:         ${omvPassword.replace(/./g, '*')}
-    omv-exposed-networks: ${omvExposedNetworks.join(', ')}
-    scan-interval:        ${scanIterval}
-    login-interval:       ${loginIterval}
-    ha-discovery:         ${haDiscovery ? 'enabled' : 'disabled'}
-    ha-prefix:            ${haPrefix}
-    log:                  ${args.l.toUpperCase()}
+    mqtt-uri:                ${mqttUri}
+    mqtt-prefix:             ${mqttPrefix}
+    mqtt-retain:             ${mqttRetain ? 'enabled' : 'disabled'}
+    mqtt-qos:                ${mqttQos}
+    omv-url:                 ${omvUrl}
+    omv-login:               ${omvLogin}
+    omv-password:            ${omvPassword.replace(/./g, '*')}
+    omv-exposed-networks:    ${omvExposedNetworks.join(', ')}
+    omv-disable-check-https: ${omvDisableCheckHttps ? 'enabled' : 'disabled'}
+    scan-interval:           ${scanIterval}
+    login-interval:          ${loginIterval}
+    ha-discovery:            ${haDiscovery ? 'enabled' : 'disabled'}
+    ha-prefix:               ${haPrefix}
+    log:                     ${args.l.toUpperCase()}
 `);
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false, // Attention: cela désactive la vérification SSL
@@ -670,13 +671,17 @@ const main = async () => {
         const updateDisks = async () => {
             try {
                 console.debug('Update Disks');
-                const [infos, smarts,] = await Promise.all([
+                const [infos, smarts, fss,] = await Promise.all([
                     requestOMV({ "service": "DiskMgmt", "method": "enumerateDevices", "params": { "limit": -1, "start": 0 }, "options": null }).catch(e => {
                         console.error('Error on call disks infos', e);
                         return null;
                     }),
                     requestOMV({ "service": "Smart", "method": "getList", "params": { "limit": -1, "start": 0 }, "options": null }).catch(e => {
                         console.error('Error on call disks smarts', e);
+                        return null;
+                    }),
+                    requestOMV({ "service": "FileSystemMgmt", "method": "enumerateFilesystems", "params": { "limit": -1, "start": 0 }, "options": null }).catch(e => {
+                        console.error('Error on call disks fs', e);
                         return null;
                     }),
                 ]);
@@ -702,8 +707,8 @@ const main = async () => {
                     };
                     const attributes = {
                         size: disk?.info?.size || 'unknown',
-                        canonicaldevicefile: disk?.info?.canonicaldevicefile || 'unknown',
                         devicefile: disk?.info?.devicefile || 'unknown',
+                        canonicaldevicefile: disk?.info?.canonicaldevicefile || 'unknown',
                         devicename: disk?.info?.devicename || 'unknown',
                         description: disk?.info?.description || 'unknown',
                         serialnumber: disk?.info?.serialnumber || 'unknown',
@@ -734,110 +739,95 @@ const main = async () => {
                         unit_of_measurement: '°C',
                         state_class: 'measurement'
                     });
-                }
-            }
-            catch (e) {
-                console.error(e);
-                dateLogin = null;
-            }
-        };
-        const updateFS = async () => {
-            try {
-                console.debug('Update Files systems');
-                const json = await requestOMV({ "service": "FileSystemMgmt", "method": "enumerateFilesystems", "params": { "limit": -1, "start": 0 }, "options": null });
-                for (const fs of json.response) {
-                    const name = fs.devicename;
-                    const label = fs.label || fs.devicename;
-                    const device = {
-                        "identifiers": [mqttPrefix + '.filesystem.' + name],
-                        "name": `${mqttPrefix.toUpperCase()} - File System - ${label}`,
-                        "model": "Open Media Vault",
-                        'configuration_url': omvUrl,
-                        get sw_version() {
-                            return jsonSystem?.response?.version || null;
-                        },
-                    };
-                    const attributes = {
-                        devicename: name,
-                        devicefile: fs.devicefile || 'unknown',
-                        devicefiles: JSON.stringify(fs.devicefiles || []),
-                        predictabledevicefile: fs.predictabledevicefile || 'unknown',
-                        canonicaldevicefile: fs.predictabledevicefile.canonicaldevicefile || 'unknown',
-                        parentdevicefile: fs.parentdevicefile || 'unknown',
-                        devlinks: JSON.stringify(fs.devlinks || []),
-                        uuid: fs.uuid || 'unknown',
-                        label,
-                        type: fs.type,
-                        blocks: fs.blocks,
-                        description: fs.description || '',
-                        comment: fs.comment || '',
-                        quota: !fs.propquota,
-                        resize: !fs.propresize,
-                        fstab: !fs.propfstab,
-                        compress: !fs.propcompress,
-                        auto_defrag: !fs.propautodefrag,
-                        readonly: !fs.propreadonly,
-                        has_multiple_devices: !fs.hasmultipledevices,
-                    };
-                    publish(`filesystem/${name}`, {
-                        mounted: {
-                            state: fs.mounted ? 'ON' : 'OFF',
-                            attributes: JSON.stringify(attributes)
-                        },
-                        occupation: {
-                            state: (fs.percentage || 0).toString(),
-                            attributes: JSON.stringify(attributes)
-                        },
-                        size: {
-                            state: (fs.size || 0).toString(),
-                            attributes: JSON.stringify(attributes)
-                        },
-                        free: {
-                            state: (fs.available || 0).toString(),
-                            attributes: JSON.stringify(attributes)
-                        },
-                        used: {
-                            state: Math.max(0, ((fs.size || 0) - (fs.available || 0))).toString(),
-                            attributes: JSON.stringify(attributes)
-                        },
-                    });
-                    configHA('binary_sensor', `filesystem.${name}.mounted`, 'Mounted', `filesystem/${name}/mounted`, {
-                        device,
-                        icon: 'mdi:harddisk',
-                        device_class: 'plug'
-                    });
-                    configHA('sensor', `filesystem.${name}.occupation`, 'Occupation', `filesystem/${name}/occupation`, {
-                        device,
-                        icon: 'mdi:harddisk',
-                        unit_of_measurement: '%',
-                    });
-                    configHA('sensor', `filesystem.${name}.size`, 'Size', `filesystem/${name}/size`, {
-                        device,
-                        icon: 'mdi:harddisk',
-                        device_class: 'data_size',
-                        state_class: 'measurement',
-                        unit_of_measurement: 'B',
-                        suggested_display_precision: 2,
-                        suggested_unit_of_measurement: 'GB',
-                    });
-                    configHA('sensor', `filesystem.${name}.used`, 'Used', `filesystem/${name}/used`, {
-                        device,
-                        icon: 'mdi:harddisk',
-                        device_class: 'data_size',
-                        state_class: 'measurement',
-                        unit_of_measurement: 'B',
-                        suggested_display_precision: 2,
-                        suggested_unit_of_measurement: 'GB',
-                    });
-                    configHA('sensor', `filesystem.${name}.free`, 'Free', `filesystem/${name}/free`, {
-                        device,
-                        icon: 'mdi:harddisk',
-                        device_class: 'data_size',
-                        state_class: 'measurement',
-                        unit_of_measurement: 'B',
-                        suggested_display_precision: 2,
-                        suggested_unit_of_measurement: 'GB',
-                    });
+                    if (fss?.response?.length) {
+                        for (const fs of fss.response) {
+                            if (fs.parentdevicefile === disk?.info?.canonicaldevicefile) {
+                                const fsname = fs.devicename;
+                                const label = fs.label || fs.devicename;
+                                const attributes = {
+                                    devicename: fsname,
+                                    devicefile: fs.devicefile || 'unknown',
+                                    devicefiles: JSON.stringify(fs.devicefiles || []),
+                                    predictabledevicefile: fs.predictabledevicefile || 'unknown',
+                                    canonicaldevicefile: fs.predictabledevicefile.canonicaldevicefile || 'unknown',
+                                    parentdevicefile: fs.parentdevicefile || 'unknown',
+                                    devlinks: JSON.stringify(fs.devlinks || []),
+                                    uuid: fs.uuid || 'unknown',
+                                    label,
+                                    type: fs.type,
+                                    blocks: fs.blocks,
+                                    description: fs.description || '',
+                                    comment: fs.comment || '',
+                                    quota: !fs.propquota,
+                                    resize: !fs.propresize,
+                                    fstab: !fs.propfstab,
+                                    compress: !fs.propcompress,
+                                    auto_defrag: !fs.propautodefrag,
+                                    readonly: !fs.propreadonly,
+                                    has_multiple_devices: !fs.hasmultipledevices,
+                                };
+                                publish(`disks/${name}/filesystem/${fsname}`, {
+                                    mounted: {
+                                        state: fs.mounted ? 'ON' : 'OFF',
+                                        attributes: JSON.stringify(attributes)
+                                    },
+                                    occupation: {
+                                        state: (fs.percentage || 0).toString(),
+                                        attributes: JSON.stringify(attributes)
+                                    },
+                                    size: {
+                                        state: (fs.size || 0).toString(),
+                                        attributes: JSON.stringify(attributes)
+                                    },
+                                    free: {
+                                        state: (fs.available || 0).toString(),
+                                        attributes: JSON.stringify(attributes)
+                                    },
+                                    used: {
+                                        state: Math.max(0, ((fs.size || 0) - (fs.available || 0))).toString(),
+                                        attributes: JSON.stringify(attributes)
+                                    },
+                                });
+                                configHA('binary_sensor', `disks/${name}/filesystem.${fsname}.mounted`, `FS - ${label} - Mounted`, `disks/${name}/filesystem/${fsname}/mounted`, {
+                                    device,
+                                    icon: 'mdi:harddisk',
+                                    device_class: 'plug'
+                                });
+                                configHA('sensor', `disks/${name}/filesystem.${fsname}.occupation`, `FS - ${label} - Occupation`, `disks/${name}/filesystem/${fsname}/occupation`, {
+                                    device,
+                                    icon: 'mdi:harddisk',
+                                    unit_of_measurement: '%',
+                                });
+                                configHA('sensor', `disks/${name}/filesystem.${fsname}.size`, `FS - ${label} - Size`, `disks/${name}/filesystem/${fsname}/size`, {
+                                    device,
+                                    icon: 'mdi:harddisk',
+                                    device_class: 'data_size',
+                                    state_class: 'measurement',
+                                    unit_of_measurement: 'B',
+                                    suggested_display_precision: 2,
+                                    suggested_unit_of_measurement: 'GB',
+                                });
+                                configHA('sensor', `disks/${name}/filesystem.${fsname}.used`, `FS - ${label} - Used`, `disks/${name}/filesystem/${fsname}/used`, {
+                                    device,
+                                    icon: 'mdi:harddisk',
+                                    device_class: 'data_size',
+                                    state_class: 'measurement',
+                                    unit_of_measurement: 'B',
+                                    suggested_display_precision: 2,
+                                    suggested_unit_of_measurement: 'GB',
+                                });
+                                configHA('sensor', `disks/${name}/filesystem.${fsname}.free`, `FS - ${label} - Free`, `disks/${name}/filesystem/${fsname}/free`, {
+                                    device,
+                                    icon: 'mdi:harddisk',
+                                    device_class: 'data_size',
+                                    state_class: 'measurement',
+                                    unit_of_measurement: 'B',
+                                    suggested_display_precision: 2,
+                                    suggested_unit_of_measurement: 'GB',
+                                });
+                            }
+                        }
+                    }
                 }
             }
             catch (e) {
@@ -856,7 +846,6 @@ const main = async () => {
                     updateSystem(),
                     updateNetworks(),
                     updateDisks(),
-                    updateFS(),
                 ]);
             }
             catch (e) {
