@@ -24,6 +24,7 @@ const args = minimist(rawArgv, {
 		'omv-disable-check-https',
 		'omv-exposed-networks',
 		'scan-interval',
+		'login-interval',
 		'ha-discovery',
 		'ha-prefix',
 		'log'
@@ -78,8 +79,8 @@ Parameters:
     mqtt-retain              Set retain value for MQTT, values must be 0 or 1 (default: 1),
     mqtt-qos                 Set QOS value for MQTT, values must be 0, 1 or 2 (default: 0),
     omv-url, o               Set Base URL for Open Media Vault (example: http://192.168.1.1)
-    omv-login, o             Set login for Open Media Vault
-    omv-password, o          Set password for Open Media Vault
+    omv-login, u             Set login for Open Media Vault
+    omv-password, p          Set password for Open Media Vault
     omv-exposed-networks     Exposed networks interface seprate by comma (default: eth0, wlan0)
     omv-disable-check-https  Disable check HTTPS
     scan-interval            Set scan refresh interval in second (default: 30) 
