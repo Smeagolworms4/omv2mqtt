@@ -436,7 +436,7 @@ const main = async () => {
 						})
 					},
 					uptime: {
-						state: upTime.toISOString().split('.')[0] + '+00:00',
+						state: upTime ? upTime.toISOString().split('.')[0] + '+00:00' : 'unknow',
 						attributes: JSON.stringify({})
 					},
 					update_available: {
@@ -452,7 +452,7 @@ const main = async () => {
 						attributes: JSON.stringify({})
 					},
 					cpu_temperature: {
-						state: cpuTemp?.response?.cputemp?.toString(),
+						state: cpuTemp?.response?.cputemp ? cpuTemp.response.cputemp.toString() : 'unknow',
 						attributes: JSON.stringify({})
 					},
 					last_refresh: {
