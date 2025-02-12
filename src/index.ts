@@ -452,7 +452,7 @@ const main = async () => {
 						attributes: JSON.stringify({})
 					},
 					cpu_temperature: {
-						state: cpuTemp.response.cputemp.toString(),
+						state: cpuTemp?.response?.cputemp?.toString(),
 						attributes: JSON.stringify({})
 					},
 					last_refresh: {
